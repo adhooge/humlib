@@ -3,6 +3,80 @@ humlib
 
 [![Travis Build Status](https://travis-ci.org/craigsapp/humlib.svg?branch=master)](https://travis-ci.org/craigsapp/humlib) [![AppVeyor Build Status](https://ci.appveyor.com/api/projects/status/e08c7i6tl17j3ip2?svg=true)](https://ci.appveyor.com/project/craigsapp/humlib)
 
+MusicXML → Humdrum conversion (this fork)
+=========================================
+
+This fork is pinned for converting the **MuseSyn** MusicXML corpus to Humdrum
+`**kern` with the `musicxml2hum` tool. On this branch the converter handles
+**209 of 210** MuseSyn scores (the one remaining file crashes inside
+`musicxml2hum` and cannot be converted with this tool).
+
+> **Why this branch and not `master`:** `master` tracks the upstream
+> "active" humlib line. It builds, but converts only ~180/210 of the same
+> corpus — a regression for this task. The commit on *this* branch is the
+> older, verified line plus a one-line GCC-15 build fix (`#include <cstdint>`).
+> Keep using this branch for MuseSyn conversion.
+
+Building `musicxml2hum`
+-----------------------
+
+Requires `g++` (GCC 15 is fine) and `make`. From the repository root:
+
+```console
+make library         # builds lib/libhumlib.a (regenerates the amalgamation first)
+make pugixml         # builds lib/libpugixml.a (the XML parser musicxml2hum links)
+make musicxml2hum    # builds bin/musicxml2hum
+```
+
+The order matters: `musicxml2hum` links against both `libhumlib.a` and
+`libpugixml.a`, so build the two libraries before the tool. The result is
+`bin/musicxml2hum`.
+
+Converting scores
+-----------------
+
+`musicxml2hum` reads a MusicXML file as its argument and writes Humdrum to
+**stdout**, so redirect to a `.krn` file:
+
+```console
+bin/musicxml2hum input.xml > output.krn
+```
+
+Convert every `.xml` in a folder, keeping the same base names:
+
+```console
+mkdir -p kern
+for f in /path/to/xml/*.xml; do
+  name=$(basename "$f" .xml)
+  if bin/musicxml2hum "$f" > "kern/$name.krn" 2>/dev/null && grep -q '\*\*kern' "kern/$name.krn"; then
+    echo "ok   : $name"
+  else
+    rm -f "kern/$name.krn"          # discard empty/garbage output from the 1 crashing file
+    echo "FAIL : $name"
+  fi
+done
+```
+
+The `grep -q '**kern'` check plus the `rm` on failure ensures only valid
+conversions are kept — `musicxml2hum` exits non-zero (or aborts) on the file
+it cannot parse, leaving no `.krn` behind.
+
+A good conversion looks like this (note the separate `**dynam` spine and the
+key designation `*D:`, which the older `xml2hum` tool did not produce):
+
+```
+**kern	**kern	**dynam
+*part1	*part1	*part1
+*clefF4	*clefG2	*
+*k[f#c#]	*k[f#c#]	*
+*D:	*D:	*
+=1	=1	=1
+(>8DL	(>2ff#	pp
+```
+
+---
+
+
 
 The humlib library consists of a set of C++ classes for parsing
 [Humdrum](http://www.humdrum.org) data files.  The library is designed
